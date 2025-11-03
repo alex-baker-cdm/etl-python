@@ -22,6 +22,7 @@ def test_pipeline_instantiation():
     assert pipeline is not None
     assert pipeline.population is None
     assert pipeline.unemployment is None
+    assert pipeline.death is None
 
 
 def test_extract():
@@ -31,10 +32,13 @@ def test_extract():
     
     assert pipeline.population is not None
     assert pipeline.unemployment is not None
+    assert pipeline.death is not None
     assert isinstance(pipeline.population, pd.DataFrame)
     assert isinstance(pipeline.unemployment, pd.DataFrame)
+    assert isinstance(pipeline.death, pd.DataFrame)
     assert len(pipeline.population) > 0
     assert len(pipeline.unemployment) > 0
+    assert len(pipeline.death) > 0
 
 
 def test_transform():
@@ -49,8 +53,12 @@ def test_transform():
     expected_unemp_cols = ['FIPStxt', 'State', 'Area_name', 'Year', 'Unemployment_rate']
     assert list(pipeline.unemployment.columns) == expected_unemp_cols
     
+    expected_death_cols = ['CBSA', 'MDIV', 'STCOU', 'NAME', 'LSAD', 'YEAR', 'DEATHS']
+    assert list(pipeline.death.columns) == expected_death_cols
+    
     assert pipeline.population['YEAR'].dtype == object
     assert pipeline.unemployment['Year'].dtype == object
+    assert pipeline.death['YEAR'].dtype == object
 
 
 def test_load(test_db, monkeypatch):
@@ -73,9 +81,11 @@ def test_load(test_db, monkeypatch):
     
     pop_count = cur.execute("SELECT COUNT(*) FROM population").fetchone()[0]
     unemp_count = cur.execute("SELECT COUNT(*) FROM unemployment").fetchone()[0]
+    death_count = cur.execute("SELECT COUNT(*) FROM death").fetchone()[0]
     
     assert pop_count > 0
     assert unemp_count > 0
+    assert death_count > 0
     
     conn.close()
 
@@ -99,14 +109,18 @@ def test_pipeline_end_to_end(test_db, monkeypatch):
     
     pop_count = cur.execute("SELECT COUNT(*) FROM population").fetchone()[0]
     unemp_count = cur.execute("SELECT COUNT(*) FROM unemployment").fetchone()[0]
+    death_count = cur.execute("SELECT COUNT(*) FROM death").fetchone()[0]
     
     assert pop_count == 22312
     assert unemp_count == 65500
+    assert death_count == 22312
     
     pop_schema = cur.execute("PRAGMA table_info(population)").fetchall()
     unemp_schema = cur.execute("PRAGMA table_info(unemployment)").fetchall()
+    death_schema = cur.execute("PRAGMA table_info(death)").fetchall()
     
     assert len(pop_schema) == 7
     assert len(unemp_schema) == 5
+    assert len(death_schema) == 7
     
     conn.close()

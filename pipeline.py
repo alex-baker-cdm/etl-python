@@ -6,6 +6,7 @@ class Pipeline(object):
     def __init__(self):
         self.population = None
         self.unemployment = None
+        self.death = None
 
     def extract(self):
         """
@@ -21,6 +22,7 @@ class Pipeline(object):
 
         self.population = pd.read_csv(url_popul_est, encoding='ISO-8859-1')
         self.unemployment = pd.read_excel(url_unemployment, skiprows=7)
+        self.death = pd.read_csv(url_popul_est, encoding='ISO-8859-1')
 
     def transform(self):
         # formatting Population dataset
@@ -58,10 +60,28 @@ class Pipeline(object):
         self.unemployment['Year'] = self.unemployment['Year'].apply(
             lambda x: x[-4:])  # remove prefix i.e. 'Unemployment_rate_XXXX'
 
+        # formatting Death dataset
+
+        # keep the relevant columns only i.e. death count columns and index names
+        death_idx = ['CBSA', 'MDIV', 'STCOU', 'NAME', 'LSAD']
+        death_cols = [c for c in self.death.columns if c.startswith('DEATHS')]
+        death = self.death[death_idx + death_cols].copy()
+
+        # melt, "unpivot" the yearly death values (from wide format 'columns' to long format 'rows')
+        self.death = death.melt(id_vars=death_idx,
+                                value_vars=death_cols,
+                                var_name='YEAR',
+                                value_name='DEATHS')
+
+        # fix columns values
+        self.death['YEAR'] = self.death['YEAR'].apply(
+            lambda x: x[-4:])  # e.g. DEATHS2010 -> 2010
+
     def load(self):
         db = DB()
         self.population.to_sql('population', db.conn, if_exists='append', index=False)
         self.unemployment.to_sql('unemployment', db.conn, if_exists='append', index=False)
+        self.death.to_sql('death', db.conn, if_exists='append', index=False)
 
 
 class DB(object):
@@ -94,8 +114,19 @@ class DB(object):
             unemployment_rate REAL
             );"""
 
+        table3 = f"""CREATE TABLE IF NOT EXISTS death(
+            CBSA INTEGER,
+            MDIV REAL,
+            STCOU INTEGER,
+            NAME TEXT,
+            LSAD TEXT,
+            YEAR INTEGER,
+            DEATHS INTEGER
+            );"""
+
         self.cur.execute(table1)
         self.cur.execute(table2)
+        self.cur.execute(table3)
 
 
 if __name__ == '__main__':
