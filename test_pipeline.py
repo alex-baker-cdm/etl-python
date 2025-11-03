@@ -22,6 +22,7 @@ def test_pipeline_instantiation():
     assert pipeline is not None
     assert pipeline.population is None
     assert pipeline.unemployment is None
+    assert pipeline.births is None
 
 
 def test_extract():
@@ -35,6 +36,9 @@ def test_extract():
     assert isinstance(pipeline.unemployment, pd.DataFrame)
     assert len(pipeline.population) > 0
     assert len(pipeline.unemployment) > 0
+    
+    birth_cols = [c for c in pipeline.population.columns if c.startswith('BIRTHS')]
+    assert len(birth_cols) == 8
 
 
 def test_transform():
@@ -49,8 +53,12 @@ def test_transform():
     expected_unemp_cols = ['FIPStxt', 'State', 'Area_name', 'Year', 'Unemployment_rate']
     assert list(pipeline.unemployment.columns) == expected_unemp_cols
     
+    expected_birth_cols = ['CBSA', 'MDIV', 'STCOU', 'NAME', 'LSAD', 'YEAR', 'BIRTHS']
+    assert list(pipeline.births.columns) == expected_birth_cols
+    
     assert pipeline.population['YEAR'].dtype == object
     assert pipeline.unemployment['Year'].dtype == object
+    assert pipeline.births['YEAR'].dtype == object
 
 
 def test_load(test_db, monkeypatch):
@@ -73,9 +81,11 @@ def test_load(test_db, monkeypatch):
     
     pop_count = cur.execute("SELECT COUNT(*) FROM population").fetchone()[0]
     unemp_count = cur.execute("SELECT COUNT(*) FROM unemployment").fetchone()[0]
+    birth_count = cur.execute("SELECT COUNT(*) FROM births").fetchone()[0]
     
     assert pop_count > 0
     assert unemp_count > 0
+    assert birth_count > 0
     
     conn.close()
 
@@ -99,14 +109,18 @@ def test_pipeline_end_to_end(test_db, monkeypatch):
     
     pop_count = cur.execute("SELECT COUNT(*) FROM population").fetchone()[0]
     unemp_count = cur.execute("SELECT COUNT(*) FROM unemployment").fetchone()[0]
+    birth_count = cur.execute("SELECT COUNT(*) FROM births").fetchone()[0]
     
     assert pop_count == 22312
     assert unemp_count == 65500
+    assert birth_count == 22312
     
     pop_schema = cur.execute("PRAGMA table_info(population)").fetchall()
     unemp_schema = cur.execute("PRAGMA table_info(unemployment)").fetchall()
+    birth_schema = cur.execute("PRAGMA table_info(births)").fetchall()
     
     assert len(pop_schema) == 7
     assert len(unemp_schema) == 5
+    assert len(birth_schema) == 7
     
     conn.close()

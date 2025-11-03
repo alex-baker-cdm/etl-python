@@ -6,6 +6,7 @@ class Pipeline(object):
     def __init__(self):
         self.population = None
         self.unemployment = None
+        self.births = None
 
     def extract(self):
         """
@@ -23,12 +24,14 @@ class Pipeline(object):
         self.unemployment = pd.read_excel(url_unemployment, skiprows=7)
 
     def transform(self):
+        raw_data = self.population
+        
         # formatting Population dataset
 
         # keep the relevant columns only i.e. the columns that contain year-population-estimate and index names
         pop_idx = ['CBSA', 'MDIV', 'STCOU', 'NAME', 'LSAD']
-        pop_cols = [c for c in self.population.columns if c.startswith('POPEST')]
-        population = self.population[pop_idx + pop_cols].copy()
+        pop_cols = [c for c in raw_data.columns if c.startswith('POPEST')]
+        population = raw_data[pop_idx + pop_cols].copy()
 
         # melt, "unpivot" the yearly rate values (from wide format 'columns' to long format 'rows')
         self.population = population.melt(id_vars=pop_idx,
@@ -38,6 +41,23 @@ class Pipeline(object):
 
         # fix columns values
         self.population['YEAR'] = self.population['YEAR'].apply(
+            lambda x: x[-4:])
+
+        # formatting Birth dataset
+
+        # keep the relevant columns only i.e. the columns that contain year-birth-data and index names
+        birth_idx = ['CBSA', 'MDIV', 'STCOU', 'NAME', 'LSAD']
+        birth_cols = [c for c in raw_data.columns if c.startswith('BIRTHS')]
+        births = raw_data[birth_idx + birth_cols].copy()
+
+        # melt, "unpivot" the yearly rate values (from wide format 'columns' to long format 'rows')
+        self.births = births.melt(id_vars=birth_idx,
+                                  value_vars=birth_cols,
+                                  var_name='YEAR',
+                                  value_name='BIRTHS')
+
+        # fix columns values
+        self.births['YEAR'] = self.births['YEAR'].apply(
             lambda x: x[-4:])  # e.g. POPESTIMATE2010 -> 2010
 
         # formatting Unemployment dataset
@@ -62,6 +82,7 @@ class Pipeline(object):
         db = DB()
         self.population.to_sql('population', db.conn, if_exists='append', index=False)
         self.unemployment.to_sql('unemployment', db.conn, if_exists='append', index=False)
+        self.births.to_sql('births', db.conn, if_exists='append', index=False)
 
 
 class DB(object):
@@ -94,8 +115,19 @@ class DB(object):
             unemployment_rate REAL
             );"""
 
+        table3 = f"""CREATE TABLE IF NOT EXISTS births(
+            CBSA INTEGER,
+            MDIV REAL,
+            STCOU INTEGER,
+            NAME TEXT,
+            LSAD TEXT,
+            YEAR INTEGER,
+            BIRTHS INTEGER
+            );"""
+
         self.cur.execute(table1)
         self.cur.execute(table2)
+        self.cur.execute(table3)
 
 
 if __name__ == '__main__':
