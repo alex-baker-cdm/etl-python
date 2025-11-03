@@ -39,6 +39,8 @@ class Pipeline(object):
         # fix columns values
         self.population['YEAR'] = self.population['YEAR'].apply(
             lambda x: x[-4:])  # e.g. POPESTIMATE2010 -> 2010
+        self.population = self.population[self.population['YEAR'] != '2015']
+
 
         # formatting Unemployment dataset
 
@@ -57,6 +59,8 @@ class Pipeline(object):
         self.unemployment = self.unemployment.round(1)  # set precision to .1
         self.unemployment['Year'] = self.unemployment['Year'].apply(
             lambda x: x[-4:])  # remove prefix i.e. 'Unemployment_rate_XXXX'
+
+        self.unemployment = self.unemployment[self.unemployment['Year'] != '2015']
 
     def load(self):
         db = DB()
