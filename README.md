@@ -43,7 +43,7 @@ Done. See: result in "db.sqlite"
 
 - pandas
 - xlrd (for reading excel file)
-- Python >= 3.6
+- Python >= 3.12
 
 
 <hr>
