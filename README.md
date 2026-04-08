@@ -41,8 +41,8 @@ Done. See: result in "db.sqlite"
 
 ## Requirements
 
-- pandas
-- xlrd (for reading excel file)
+- polars (with calamine extra for reading Excel files)
+- matplotlib (for plotting in analysis notebook)
 - Python >= 3.6
 
 
