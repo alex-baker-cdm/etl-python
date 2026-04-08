@@ -1,7 +1,7 @@
 import pytest
 import sqlite3
 import os
-import pandas as pd
+import polars as pl
 from pipeline import Pipeline, DB
 
 
@@ -31,8 +31,8 @@ def test_extract():
     
     assert pipeline.population is not None
     assert pipeline.unemployment is not None
-    assert isinstance(pipeline.population, pd.DataFrame)
-    assert isinstance(pipeline.unemployment, pd.DataFrame)
+    assert isinstance(pipeline.population, pl.DataFrame)
+    assert isinstance(pipeline.unemployment, pl.DataFrame)
     assert len(pipeline.population) > 0
     assert len(pipeline.unemployment) > 0
 
@@ -49,8 +49,8 @@ def test_transform():
     expected_unemp_cols = ['FIPStxt', 'State', 'Area_name', 'Year', 'Unemployment_rate']
     assert list(pipeline.unemployment.columns) == expected_unemp_cols
     
-    assert pipeline.population['YEAR'].dtype == object
-    assert pipeline.unemployment['Year'].dtype == object
+    assert pipeline.population['YEAR'].dtype == pl.Utf8
+    assert pipeline.unemployment['Year'].dtype == pl.Utf8
 
 
 def test_load(test_db, monkeypatch):

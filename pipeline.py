@@ -1,5 +1,5 @@
 import sqlite3
-import pandas as pd
+import polars as pl
 
 
 class Pipeline(object):
@@ -19,8 +19,8 @@ class Pipeline(object):
         #url_unemployment = 'https://www.ers.usda.gov/webdocs/DataFiles/48747/Unemployment.xls'
         url_unemployment = 'data/Unemployment.xls'
 
-        self.population = pd.read_csv(url_popul_est, encoding='ISO-8859-1')
-        self.unemployment = pd.read_excel(url_unemployment, skiprows=7)
+        self.population = pl.read_csv(url_popul_est, encoding='ISO-8859-1')
+        self.unemployment = pl.read_excel(url_unemployment, read_options={"header_row": 7}, engine="calamine")
 
     def transform(self):
         # formatting Population dataset
@@ -28,40 +28,56 @@ class Pipeline(object):
         # keep the relevant columns only i.e. the columns that contain year-population-estimate and index names
         pop_idx = ['CBSA', 'MDIV', 'STCOU', 'NAME', 'LSAD']
         pop_cols = [c for c in self.population.columns if c.startswith('POPEST')]
-        population = self.population[pop_idx + pop_cols].copy()
+        self.population = self.population.select(pop_idx + pop_cols)
 
         # melt, "unpivot" the yearly rate values (from wide format 'columns' to long format 'rows')
-        self.population = population.melt(id_vars=pop_idx,
-                                          value_vars=pop_cols,
-                                          var_name='YEAR',
-                                          value_name='POPULATION_EST')
+        self.population = self.population.unpivot(index=pop_idx,
+                                                  on=pop_cols,
+                                                  variable_name='YEAR',
+                                                  value_name='POPULATION_EST')
 
         # fix columns values
-        self.population['YEAR'] = self.population['YEAR'].apply(
-            lambda x: x[-4:])  # e.g. POPESTIMATE2010 -> 2010
+        self.population = self.population.with_columns(
+            pl.col('YEAR').str.slice(-4).alias('YEAR'))  # e.g. POPESTIMATE2010 -> 2010
 
         # formatting Unemployment dataset
 
         # keep the relevant columns only i.e. unemployment-rate-year and names
         unemp_idx = ['FIPStxt', 'State', 'Area_name']
         unemp_cols = [c for c in self.unemployment.columns if c.startswith('Unemployment_rate')]
-        unemployment = self.unemployment[unemp_idx + unemp_cols].copy()
+        self.unemployment = self.unemployment.select(unemp_idx + unemp_cols)
 
         # melt, "unpivot" the yearly rate values (from wide format 'columns' to long format 'rows')
-        self.unemployment = unemployment.melt(id_vars=unemp_idx,
-                                              value_vars=unemp_cols,
-                                              var_name='Year',
-                                              value_name='Unemployment_rate')
+        self.unemployment = self.unemployment.unpivot(index=unemp_idx,
+                                                      on=unemp_cols,
+                                                      variable_name='Year',
+                                                      value_name='Unemployment_rate')
 
         # fix columns values
-        self.unemployment = self.unemployment.round(1)  # set precision to .1
-        self.unemployment['Year'] = self.unemployment['Year'].apply(
-            lambda x: x[-4:])  # remove prefix i.e. 'Unemployment_rate_XXXX'
+        self.unemployment = self.unemployment.with_columns(
+            pl.col('Unemployment_rate').round(1))  # set precision to .1
+        self.unemployment = self.unemployment.with_columns(
+            pl.col('Year').str.slice(-4).alias('Year'))  # remove prefix i.e. 'Unemployment_rate_XXXX'
 
     def load(self):
         db = DB()
-        self.population.to_sql('population', db.conn, if_exists='append', index=False)
-        self.unemployment.to_sql('unemployment', db.conn, if_exists='append', index=False)
+        # Population
+        pop_rows = self.population.rows()
+        pop_cols = self.population.columns
+        placeholders = ', '.join(['?'] * len(pop_cols))
+        db.cur.executemany(
+            f"INSERT INTO population ({', '.join(pop_cols)}) VALUES ({placeholders})",
+            pop_rows
+        )
+        # Unemployment
+        unemp_rows = self.unemployment.rows()
+        unemp_cols = self.unemployment.columns
+        placeholders = ', '.join(['?'] * len(unemp_cols))
+        db.cur.executemany(
+            f"INSERT INTO unemployment ({', '.join(unemp_cols)}) VALUES ({placeholders})",
+            unemp_rows
+        )
+        db.conn.commit()
 
 
 class DB(object):

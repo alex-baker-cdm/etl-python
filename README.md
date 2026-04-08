@@ -41,9 +41,9 @@ Done. See: result in "db.sqlite"
 
 ## Requirements
 
-- pandas
-- xlrd (for reading excel file)
-- Python >= 3.6
+- polars
+- calamine (for reading excel files)
+- Python >= 3.8
 
 
 <hr>
